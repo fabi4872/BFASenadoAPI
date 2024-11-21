@@ -4,14 +4,9 @@ using Nethereum.Web3.Accounts;
 using System.Numerics;
 using Nethereum.ABI.FunctionEncoding.Attributes;
 using Nethereum.Web3;
-using static Microsoft.EntityFrameworkCore.DbLoggerCategory.Database;
-using Microsoft.EntityFrameworkCore;
 using Nethereum.Hex.HexConvertors.Extensions;
-using System.Text;
-using System.Security.Cryptography;
-using System.Security.Policy;
-using Nethereum.BlockchainProcessing.BlockStorage.Entities;
 using BFASenado.Models;
+using Microsoft.EntityFrameworkCore;
 
 namespace BFASenado.Controllers
 {
@@ -22,561 +17,37 @@ namespace BFASenado.Controllers
         #region Attributes
 
         // DB
-        //private readonly BFAContext _context;
+        private readonly BFAContext _context;
 
         // Logger
         private readonly ILogger<BFAController> _logger;
 
-        // URL del nodo de prueba
-        //private const string UrlNodoPrueba = "http://127.0.0.1:7545";
-        private const string UrlNodoPrueba = "http://public.test2.bfa.ar:8545";
-
-        // Chain ID (Network ID) del nodo de prueba
-        private const int ChainID = 99118822;
-        //private const long ChainID = 5777;
-
-        private const string Tabla = "TRANSACCION";
-
-        // Key privada (Signature)
-        private const string PrivateKey = "0x4dc681e132aaecb26a118729cea8c754b5e29faf25ca796cbf3d56a373775205";
-        //private const string PrivateKeyV2 = "0xeeb38bc44e3c3cfae7318dee9dd1c14d51a359ad601c0f590b3079e692abeeff";
-        private const string PrivateKeyV2 = "0x52e5332f343b6953830ffc355210a59bfe11079700f7c46c6bc7da5250f3e67b";
-
-        // Dirección del contrato
-        private const string ContractAddress = "0x0071C2215a4DFE116611c6403335b363F0f663Cb";
-        //private const string ContractAddressV2 = "0xe194054d31C96987B6bED1e4cD5096aD35994d91";
-        private const string ContractAddressV2 = "0xA6648B756C7aecd65F9e4cDE1111bbEF3F1A5Be9";
-
-        // ABI del contrato
-        private const string ABI = @"[
-    {
-      ""inputs"": [],
-      ""stateMutability"": ""nonpayable"",
-      ""type"": ""constructor""
-    },
-    {
-      ""inputs"": [
-        {
-          ""internalType"": ""uint256"",
-          ""name"": """",
-          ""type"": ""uint256""
-        }
-      ],
-      ""name"": ""stamplist"",
-      ""outputs"": [
-        {
-          ""internalType"": ""uint256"",
-          ""name"": ""object"",
-          ""type"": ""uint256""
-        },
-        {
-          ""internalType"": ""address"",
-          ""name"": ""stamper"",
-          ""type"": ""address""
-        },
-        {
-          ""internalType"": ""uint256"",
-          ""name"": ""blockno"",
-          ""type"": ""uint256""
-        }
-      ],
-      ""stateMutability"": ""view"",
-      ""type"": ""function"",
-      ""constant"": true
-    },
-    {
-      ""inputs"": [
-        {
-          ""internalType"": ""uint256[]"",
-          ""name"": ""objectlist"",
-          ""type"": ""uint256[]""
-        }
-      ],
-      ""name"": ""put"",
-      ""outputs"": [],
-      ""stateMutability"": ""nonpayable"",
-      ""type"": ""function""
-    },
-    {
-      ""inputs"": [
-        {
-          ""internalType"": ""uint256"",
-          ""name"": ""pos"",
-          ""type"": ""uint256""
-        }
-      ],
-      ""name"": ""getStamplistPos"",
-      ""outputs"": [
-        {
-          ""internalType"": ""uint256"",
-          ""name"": """",
-          ""type"": ""uint256""
-        },
-        {
-          ""internalType"": ""address"",
-          ""name"": """",
-          ""type"": ""address""
-        },
-        {
-          ""internalType"": ""uint256"",
-          ""name"": """",
-          ""type"": ""uint256""
-        }
-      ],
-      ""stateMutability"": ""view"",
-      ""type"": ""function"",
-      ""constant"": true
-    },
-    {
-      ""inputs"": [
-        {
-          ""internalType"": ""uint256"",
-          ""name"": ""object"",
-          ""type"": ""uint256""
-        }
-      ],
-      ""name"": ""getObjectCount"",
-      ""outputs"": [
-        {
-          ""internalType"": ""uint256"",
-          ""name"": """",
-          ""type"": ""uint256""
-        }
-      ],
-      ""stateMutability"": ""view"",
-      ""type"": ""function"",
-      ""constant"": true
-    },
-    {
-      ""inputs"": [
-        {
-          ""internalType"": ""uint256"",
-          ""name"": ""object"",
-          ""type"": ""uint256""
-        },
-        {
-          ""internalType"": ""uint256"",
-          ""name"": ""pos"",
-          ""type"": ""uint256""
-        }
-      ],
-      ""name"": ""getObjectPos"",
-      ""outputs"": [
-        {
-          ""internalType"": ""uint256"",
-          ""name"": """",
-          ""type"": ""uint256""
-        }
-      ],
-      ""stateMutability"": ""view"",
-      ""type"": ""function"",
-      ""constant"": true
-    },
-    {
-      ""inputs"": [
-        {
-          ""internalType"": ""address"",
-          ""name"": ""stamper"",
-          ""type"": ""address""
-        }
-      ],
-      ""name"": ""getStamperCount"",
-      ""outputs"": [
-        {
-          ""internalType"": ""uint256"",
-          ""name"": """",
-          ""type"": ""uint256""
-        }
-      ],
-      ""stateMutability"": ""view"",
-      ""type"": ""function"",
-      ""constant"": true
-    },
-    {
-      ""inputs"": [
-        {
-          ""internalType"": ""address"",
-          ""name"": ""stamper"",
-          ""type"": ""address""
-        },
-        {
-          ""internalType"": ""uint256"",
-          ""name"": ""pos"",
-          ""type"": ""uint256""
-        }
-      ],
-      ""name"": ""getStamperPos"",
-      ""outputs"": [
-        {
-          ""internalType"": ""uint256"",
-          ""name"": """",
-          ""type"": ""uint256""
-        }
-      ],
-      ""stateMutability"": ""view"",
-      ""type"": ""function"",
-      ""constant"": true
-    },
-    {
-      ""inputs"": [
-        {
-          ""internalType"": ""uint256"",
-          ""name"": ""h"",
-          ""type"": ""uint256""
-        }
-      ],
-      ""name"": ""checkHash"",
-      ""outputs"": [
-        {
-          ""internalType"": ""bool"",
-          ""name"": """",
-          ""type"": ""bool""
-        }
-      ],
-      ""stateMutability"": ""view"",
-      ""type"": ""function"",
-      ""constant"": true
-    },
-    {
-      ""inputs"": [
-        {
-          ""internalType"": ""uint256"",
-          ""name"": ""h"",
-          ""type"": ""uint256""
-        }
-      ],
-      ""name"": ""getHashData"",
-      ""outputs"": [
-        {
-          ""internalType"": ""uint256[]"",
-          ""name"": """",
-          ""type"": ""uint256[]""
-        },
-        {
-          ""internalType"": ""address[]"",
-          ""name"": """",
-          ""type"": ""address[]""
-        },
-        {
-          ""internalType"": ""uint256[]"",
-          ""name"": """",
-          ""type"": ""uint256[]""
-        }
-      ],
-      ""stateMutability"": ""view"",
-      ""type"": ""function"",
-      ""constant"": true
-    },
-    {
-      ""inputs"": [],
-      ""name"": ""getAllHashes"",
-      ""outputs"": [
-        {
-          ""internalType"": ""uint256[]"",
-          ""name"": """",
-          ""type"": ""uint256[]""
-        }
-      ],
-      ""stateMutability"": ""view"",
-      ""type"": ""function"",
-      ""constant"": true
-    }
-]";
-        private const string ABIV2 = @"[
-    {
-      ""inputs"": [],
-      ""payable"": false,
-      ""stateMutability"": ""nonpayable"",
-      ""type"": ""constructor""
-    },
-    {
-      ""constant"": true,
-      ""inputs"": [
-        {
-          ""internalType"": ""uint256"",
-          ""name"": """",
-          ""type"": ""uint256""
-        }
-      ],
-      ""name"": ""stamplist"",
-      ""outputs"": [
-        {
-          ""internalType"": ""uint256"",
-          ""name"": ""object"",
-          ""type"": ""uint256""
-        },
-        {
-          ""internalType"": ""address"",
-          ""name"": ""stamper"",
-          ""type"": ""address""
-        },
-        {
-          ""internalType"": ""uint256"",
-          ""name"": ""blockno"",
-          ""type"": ""uint256""
-        },
-        {
-          ""internalType"": ""uint256"",
-          ""name"": ""idTabla"",
-          ""type"": ""uint256""
-        },
-        {
-          ""internalType"": ""string"",
-          ""name"": ""nombreTabla"",
-          ""type"": ""string""
-        }
-      ],
-      ""payable"": false,
-      ""stateMutability"": ""view"",
-      ""type"": ""function""
-    },
-    {
-      ""constant"": false,
-      ""inputs"": [
-        {
-          ""internalType"": ""uint256[]"",
-          ""name"": ""objectlist"",
-          ""type"": ""uint256[]""
-        },
-        {
-          ""internalType"": ""uint256"",
-          ""name"": ""idTabla"",
-          ""type"": ""uint256""
-        },
-        {
-          ""internalType"": ""string"",
-          ""name"": ""nombreTabla"",
-          ""type"": ""string""
-        }
-      ],
-      ""name"": ""put"",
-      ""outputs"": [],
-      ""payable"": false,
-      ""stateMutability"": ""nonpayable"",
-      ""type"": ""function""
-    },
-    {
-      ""constant"": true,
-      ""inputs"": [
-        {
-          ""internalType"": ""uint256"",
-          ""name"": ""pos"",
-          ""type"": ""uint256""
-        }
-      ],
-      ""name"": ""getStamplistPos"",
-      ""outputs"": [
-        {
-          ""internalType"": ""uint256"",
-          ""name"": """",
-          ""type"": ""uint256""
-        },
-        {
-          ""internalType"": ""address"",
-          ""name"": """",
-          ""type"": ""address""
-        },
-        {
-          ""internalType"": ""uint256"",
-          ""name"": """",
-          ""type"": ""uint256""
-        },
-        {
-          ""internalType"": ""uint256"",
-          ""name"": """",
-          ""type"": ""uint256""
-        },
-        {
-          ""internalType"": ""string"",
-          ""name"": """",
-          ""type"": ""string""
-        }
-      ],
-      ""payable"": false,
-      ""stateMutability"": ""view"",
-      ""type"": ""function""
-    },
-    {
-      ""constant"": true,
-      ""inputs"": [
-        {
-          ""internalType"": ""uint256"",
-          ""name"": ""object"",
-          ""type"": ""uint256""
-        }
-      ],
-      ""name"": ""getObjectCount"",
-      ""outputs"": [
-        {
-          ""internalType"": ""uint256"",
-          ""name"": """",
-          ""type"": ""uint256""
-        }
-      ],
-      ""payable"": false,
-      ""stateMutability"": ""view"",
-      ""type"": ""function""
-    },
-    {
-      ""constant"": true,
-      ""inputs"": [
-        {
-          ""internalType"": ""uint256"",
-          ""name"": ""object"",
-          ""type"": ""uint256""
-        },
-        {
-          ""internalType"": ""uint256"",
-          ""name"": ""pos"",
-          ""type"": ""uint256""
-        }
-      ],
-      ""name"": ""getObjectPos"",
-      ""outputs"": [
-        {
-          ""internalType"": ""uint256"",
-          ""name"": """",
-          ""type"": ""uint256""
-        }
-      ],
-      ""payable"": false,
-      ""stateMutability"": ""view"",
-      ""type"": ""function""
-    },
-    {
-      ""constant"": true,
-      ""inputs"": [
-        {
-          ""internalType"": ""address"",
-          ""name"": ""stamper"",
-          ""type"": ""address""
-        }
-      ],
-      ""name"": ""getStamperCount"",
-      ""outputs"": [
-        {
-          ""internalType"": ""uint256"",
-          ""name"": """",
-          ""type"": ""uint256""
-        }
-      ],
-      ""payable"": false,
-      ""stateMutability"": ""view"",
-      ""type"": ""function""
-    },
-    {
-      ""constant"": true,
-      ""inputs"": [
-        {
-          ""internalType"": ""address"",
-          ""name"": ""stamper"",
-          ""type"": ""address""
-        },
-        {
-          ""internalType"": ""uint256"",
-          ""name"": ""pos"",
-          ""type"": ""uint256""
-        }
-      ],
-      ""name"": ""getStamperPos"",
-      ""outputs"": [
-        {
-          ""internalType"": ""uint256"",
-          ""name"": """",
-          ""type"": ""uint256""
-        }
-      ],
-      ""payable"": false,
-      ""stateMutability"": ""view"",
-      ""type"": ""function""
-    },
-    {
-      ""constant"": true,
-      ""inputs"": [
-        {
-          ""internalType"": ""uint256"",
-          ""name"": ""h"",
-          ""type"": ""uint256""
-        }
-      ],
-      ""name"": ""checkHash"",
-      ""outputs"": [
-        {
-          ""internalType"": ""bool"",
-          ""name"": """",
-          ""type"": ""bool""
-        }
-      ],
-      ""payable"": false,
-      ""stateMutability"": ""view"",
-      ""type"": ""function""
-    },
-    {
-      ""constant"": true,
-      ""inputs"": [
-        {
-          ""internalType"": ""uint256"",
-          ""name"": ""h"",
-          ""type"": ""uint256""
-        }
-      ],
-      ""name"": ""getHashData"",
-      ""outputs"": [
-        {
-          ""internalType"": ""uint256[]"",
-          ""name"": """",
-          ""type"": ""uint256[]""
-        },
-        {
-          ""internalType"": ""address[]"",
-          ""name"": """",
-          ""type"": ""address[]""
-        },
-        {
-          ""internalType"": ""uint256[]"",
-          ""name"": """",
-          ""type"": ""uint256[]""
-        },
-        {
-          ""internalType"": ""uint256[]"",
-          ""name"": """",
-          ""type"": ""uint256[]""
-        },
-        {
-          ""internalType"": ""string[]"",
-          ""name"": """",
-          ""type"": ""string[]""
-        }
-      ],
-      ""payable"": false,
-      ""stateMutability"": ""view"",
-      ""type"": ""function""
-    },
-    {
-      ""constant"": true,
-      ""inputs"": [],
-      ""name"": ""getAllHashes"",
-      ""outputs"": [
-        {
-          ""internalType"": ""uint256[]"",
-          ""name"": """",
-          ""type"": ""uint256[]""
-        }
-      ],
-      ""payable"": false,
-      ""stateMutability"": ""view"",
-      ""type"": ""function""
-    }
-  ]";
+        // Configuration
+        private readonly IConfiguration _configuration;
+        
+        private static string? UrlNodoPrueba;
+        private static int ChainID;
+        private static string? Tabla;
+        private static string? PrivateKeyV2;
+        private static string? ContractAddressV2;
+        private static string? ABIV2;
 
         #endregion
 
         #region Constructor
 
-        public BFAController(ILogger<BFAController> logger /*BFAContext context*/)
+        public BFAController(ILogger<BFAController> logger, BFAContext context, IConfiguration configuration)
         {
             _logger = logger;
-            //_context = context;
+            _context = context;
+            _configuration = configuration;
+
+            UrlNodoPrueba = _configuration.GetSection("UrlNodoPrueba").Value;
+            ChainID = Convert.ToInt32(_configuration.GetSection("ChainID")?.Value);
+            Tabla = _configuration.GetSection("Tabla").Value;
+            PrivateKeyV2 = _configuration.GetSection("PrivateKeyV2").Value;
+            ContractAddressV2 = _configuration.GetSection("ContractAddressV2").Value;
+            ABIV2 = _configuration.GetSection("ABIV2").Value;
         }
 
         #endregion
@@ -643,8 +114,8 @@ namespace BFASenado.Controllers
                     return Ok(new { success = false, message = "El hash se encuentra registrado en la BFA." });
                 }
 
-                //bool exito = await this.GuardarTransaccionEnDB(input.Base64, hashHex);
-                if (true)
+                bool exito = await this.GuardarTransaccionEnDB(input.Base64, hashHex);
+                if (exito)
                 {
                     var transaccion = await this.ObtenerTransaccionEnDB(hashHex);
 
@@ -768,8 +239,8 @@ namespace BFASenado.Controllers
                     Hash = hash
                 };
 
-                //_context.Transaccions.Add(transaccion);
-                //await _context.SaveChangesAsync();
+                _context.Transaccions.Add(transaccion);
+                await _context.SaveChangesAsync();
             }
             catch (Exception)
             {
@@ -781,13 +252,13 @@ namespace BFASenado.Controllers
 
         private async Task<Transaccion?> ObtenerTransaccionEnDB(string hash)
         {
-            //try
-            //{
-            //    return await _context.Transaccions.FirstOrDefaultAsync(x => x.Hash == hash);
-            //}
-            //catch (Exception)
-            //{
-            //}
+            try
+            {
+                return await _context.Transaccions.FirstOrDefaultAsync(x => x.Hash == hash);
+            }
+            catch (Exception)
+            {
+            }
 
             return null;
         }

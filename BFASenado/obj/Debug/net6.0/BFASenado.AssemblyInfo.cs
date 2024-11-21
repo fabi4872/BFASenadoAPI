@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("BFASenado")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+449bbd7e7a142de481bf4bb025588341f8e7580a")]
 [assembly: System.Reflection.AssemblyProductAttribute("BFASenado")]
 [assembly: System.Reflection.AssemblyTitleAttribute("BFASenado")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

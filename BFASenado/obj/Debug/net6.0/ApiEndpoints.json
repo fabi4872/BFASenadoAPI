@@ -1,0 +1,44 @@
+[
+  {
+    "ContainingType": "BFASenado.Controllers.BFAController",
+    "Method": "StoreHash",
+    "RelativePath": "api/BFA/GuardarHash",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "input",
+        "Type": "BFASenado.Controllers.HashInput",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "BFASenado.Controllers.BFAController",
+    "Method": "GetHashData",
+    "RelativePath": "api/BFA/Hash",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "hash",
+        "Type": "System.String",
+        "IsRequired": false
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "BFASenado.Controllers.BFAController",
+    "Method": "GetHashes",
+    "RelativePath": "api/BFA/Hashes",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [],
+    "ReturnTypes": []
+  }
+]
