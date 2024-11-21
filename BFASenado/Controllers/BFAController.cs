@@ -1,0 +1,288 @@
+using Microsoft.AspNetCore.Mvc;
+using Nethereum.Contracts;
+using Nethereum.Web3.Accounts;
+using System.Numerics;
+using Nethereum.ABI.FunctionEncoding.Attributes;
+using Nethereum.Web3;
+using Nethereum.Hex.HexConvertors.Extensions;
+using BFASenado.Models;
+using Microsoft.EntityFrameworkCore;
+using BFASenado.DTO.HashDTO;
+using BFASenado.Services;
+
+namespace BFASenado.Controllers
+{
+    [Route("api/[controller]")]
+    [ApiController]
+    public class BFAController : ControllerBase
+    {
+        #region Attributes
+
+        // DB
+        private readonly BFAContext _context;
+
+        // Logger
+        private readonly ILogger<BFAController> _logger;
+
+        // Configuration
+        private readonly IConfiguration _configuration;
+
+        // MessageService
+        private readonly IMessageService _messageService;
+
+        // Propiedades de appsettings
+        private static string? UrlNodoPrueba;
+        private static int ChainID;
+        private static string? Tabla;
+        private static string? Sellador;
+        private static string? PrivateKeyV2;
+        private static string? ContractAddressV2;
+        private static string? ABIV2;
+
+        #endregion
+
+        #region Constructor
+
+        public BFAController(
+            ILogger<BFAController> logger, 
+            BFAContext context, 
+            IConfiguration configuration,
+            IMessageService messageService)
+        {
+            _logger = logger;
+            _context = context;
+            _configuration = configuration;
+            _messageService = messageService;
+
+            UrlNodoPrueba = _configuration.GetSection("UrlNodoPrueba").Value;
+            ChainID = Convert.ToInt32(_configuration.GetSection("ChainID")?.Value);
+            Tabla = _configuration.GetSection("Tabla").Value;
+            Sellador = _configuration.GetSection("Sellador").Value;
+            PrivateKeyV2 = _configuration.GetSection("PrivateKeyV2").Value;
+            ContractAddressV2 = _configuration.GetSection("ContractAddressV2").Value;
+            ABIV2 = _configuration.GetSection("ABIV2").Value;
+        }
+
+        #endregion
+
+        #region Methods
+
+        [HttpGet("Hash")]
+        public async Task<ActionResult<HashDTO>> Hash([FromQuery] string hash)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(hash.Trim()))
+                    return BadRequest(_messageService.GetHashErrorFormatoIncorrecto());
+
+                HashDTO? responseData = await this.GetHashDTO(hash, true);
+
+                if (responseData == null)
+                    return NotFound($"{_messageService.GetHashErrorNotFound()}: {hash}");
+
+                return Ok(responseData);
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"{_messageService.GetHashError()}. {ex.Message}");
+            }
+        }
+
+        // Consultar todos los hashes
+        [HttpGet("Hashes")]
+        public async Task<ActionResult<List<HashDTO>>> GetHashes()
+        {
+            try
+            {
+                var account = new Account(PrivateKeyV2, ChainID);
+                var web3 = new Web3(account, UrlNodoPrueba);
+                List<HashDTO> hashes = new List<HashDTO>();
+
+                // Activar transacciones de tipo legacy
+                web3.TransactionManager.UseLegacyAsDefault = true;
+
+                // Cargar el contrato en la dirección especificada
+                var contract = web3.Eth.GetContract(ABIV2, ContractAddressV2);
+
+                // Llamar a la función "getAllHashes" del contrato
+                var getAllHashesFunction = contract.GetFunction("getAllHashes");
+                var hashesList = await getAllHashesFunction.CallAsync<List<BigInteger>>();
+
+                // Convertir cada BigInteger en una cadena hexadecimal
+                var hashStrings = hashesList?
+                    .Select(h => "0x" + h.ToString("X").ToLower())
+                    .ToList();
+
+                // Insertar hashStrings en lista de hashes
+                foreach (var h in hashStrings)
+                {
+                    var hashDTO = await this.GetHashDTO(h, false);
+                    if (hashDTO != null)
+                    {
+                        hashes.Add(hashDTO);
+                    }
+                }
+
+                // Retornar la lista de hashes
+                return Ok(hashes);
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"{_messageService.GetHashesError()}. {ex.Message}");
+            }
+        }
+
+        // Guardar un nuevo hash
+        [HttpPost("GuardarHash")]
+        public async Task<ActionResult<HashDTO>> GuardarHash([FromBody] GuardarHashDTO input)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(input.Hash?.Trim()))
+                {
+                    return BadRequest(_messageService.GetHashErrorFormatoIncorrecto());
+                }
+
+                var account = new Account(PrivateKeyV2);
+                var web3 = new Web3(account, UrlNodoPrueba);
+                web3.TransactionManager.UseLegacyAsDefault = true;
+
+                var contract = web3.Eth.GetContract(ABIV2, ContractAddressV2);
+                var putFunction = contract.GetFunction("put");
+
+                BigInteger hashValue = input.Hash.HexToBigInteger(false);
+                string hashHex = "0x" + hashValue.ToString("X");
+
+                var checkHashFunction = contract.GetFunction("checkHash");
+                bool exists = await checkHashFunction.CallAsync<bool>(hashHex);
+                if (exists)
+                {
+                    return BadRequest(_messageService.GetHashExists());
+                }
+
+                bool exito = await this.GuardarTransaccionEnDB(input.Base64, hashHex);
+                if (exito)
+                {
+                    var transaccion = await this.ObtenerTransaccionEnDB(hashHex);
+
+                    if (transaccion != null)
+                    {
+                        var objectList = new List<BigInteger> { hashValue };
+                        var transactionHash = await putFunction.SendTransactionAsync(
+                            account.Address,
+                            new Nethereum.Hex.HexTypes.HexBigInteger(300000),
+                            null,
+                            objectList,
+                            transaccion.Id,
+                            Tabla
+                        );
+                    }
+                }
+
+                return Ok(await this.GetHashDTO(hashHex, false));
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"{_messageService.PostHashError}. {ex.Message}");
+            }
+        }
+
+        private async Task<decimal> GetBalance()
+        {
+            var web3 = new Web3(UrlNodoPrueba);
+            var balanceWei = await web3.Eth.GetBalance.SendRequestAsync(Sellador);
+            var balanceEther = Web3.Convert.FromWei(balanceWei);
+            return balanceEther;
+        }
+
+        private async Task<HashDTO?> GetHashDTO(string hash, bool showBase64)
+        {
+            if (!hash.StartsWith("0x"))
+                hash = "0x" + hash;
+            hash = hash.ToLower();
+
+            BigInteger hashValue = hash.HexToBigInteger(false);
+
+            var account = new Account(PrivateKeyV2, ChainID);
+            var web3 = new Web3(account, UrlNodoPrueba);
+            web3.TransactionManager.UseLegacyAsDefault = true;
+
+            var contract = web3.Eth.GetContract(ABIV2, ContractAddressV2);
+            var getHashDataFunction = contract.GetFunction("getHashData");
+            var result = await getHashDataFunction.CallDeserializingToObjectAsync<HashDataDTO>(hashValue);
+
+            if (result.BlockNumbers == null || result.BlockNumbers.Count == 0)
+            {
+                return null;
+            }
+
+            BigInteger blockNumber = result.BlockNumbers[0];
+            var block = await web3.Eth.Blocks.GetBlockWithTransactionsByNumber.SendRequestAsync(new Nethereum.Hex.HexTypes.HexBigInteger(blockNumber));
+
+            DateTimeOffset timeStamp = DateTimeOffset.FromUnixTimeSeconds((long)block.Timestamp.Value);
+            DateTime argentinaTime = timeStamp.ToOffset(TimeSpan.FromHours(-3)).DateTime;
+            string formattedTimeStamp = argentinaTime.ToString("dd/MM/yyyy HH:mm:ss");
+
+            var tr = await this.ObtenerTransaccionEnDB(hash);
+            string hashRecuperado = result.Objects != null && result.Objects.Count > 0 ? "0x" + result.Objects[0].ToString("X") : "No registra";
+            string signerAddress = result.Stampers != null && result.Stampers.Count > 0 ? result.Stampers[0] : "No registra";
+
+            return new HashDTO
+            {
+                NumeroBloque = blockNumber.ToString(),
+                FechaAlta = formattedTimeStamp,
+                Hash = hashRecuperado,
+                IdTabla = result.IdTablas != null && result.IdTablas.Any() ? result.IdTablas[0].ToString() : "No registra",
+                NombreTabla = result.NombreTablas?.FirstOrDefault() ?? "No registra",
+                Sellador = signerAddress,
+                Base64 = showBase64 ? tr?.Base64 : null
+            };
+        }
+
+        private async Task<bool> GuardarTransaccionEnDB(string base64, string hash)
+        {
+            try
+            {
+                Transaccion transaccion = new Transaccion()
+                {
+                    Base64 = base64,
+                    Hash = hash
+                };
+
+                _context.Transaccions.Add(transaccion);
+                await _context.SaveChangesAsync();
+                return true;
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"{_messageService.PostBaseDatosError()}. {ex.Message}");
+            }
+        }
+
+        private async Task<Transaccion?> ObtenerTransaccionEnDB(string hash)
+        {
+            try
+            {
+                return await _context.Transaccions.FirstOrDefaultAsync(x => x.Hash == hash);
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"{_messageService.GetBaseDatosError()}. {ex.Message}");
+            }
+        }
+
+        #endregion
+    }
+
+    public class StandardTokenDeployment : ContractDeploymentMessage
+    {
+        public static string BYTECODE = "0x60806040523480156200001157600080fd5b5060006040518060a00160405280600081526020013373ffffffffffffffffffffffffffffffffffffffff1681526020014381526020016000815260200160405180602001604052806000815250815250908060018154018082558091505090600182039060005260206000209060050201600090919290919091506000820151816000015560208201518160010160006101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff16021790555060408201518160020155606082015181600301556080820151816004019080519060200190620001109291906200011a565b50505050620001c9565b828054600181600116156101000203166002900490600052602060002090601f016020900481019282601f106200015d57805160ff19168380011785556200018e565b828001600101855582156200018e579182015b828111156200018d57825182559160200191906001019062000170565b5b5090506200019d9190620001a1565b5090565b620001c691905b80821115620001c2576000816000905550600101620001a8565b5090565b90565b6114a980620001d96000396000f3fe608060405234801561001057600080fd5b50600436106100bb576000357c0100000000000000000000000000000000000000000000000000000000900480639d192428116100835780639d192428146101a0578063a08d1a4f146101d4578063aceaf4a014610204578063c15ed49114610238578063fe99f74214610268576100bb565b80630500d7d0146100c05780633d76b7a3146100f45780634d48061b146101245780637a0c4fcf146101545780637e56bd5914610170575b600080fd5b6100da60048036036100d59190810190610de7565b610286565b6040516100eb959493929190611185565b60405180910390f35b61010e60048036036101099190810190610de7565b610381565b60405161011b919061114f565b60405180910390f35b61013e60048036036101399190810190610de7565b6103a3565b60405161014b919061116a565b60405180910390f35b61016e60048036036101699190810190610d68565b6103c3565b005b61018a60048036036101859190810190610e10565b6105a7565b604051610197919061116a565b60405180910390f35b6101ba60048036036101b59190810190610de7565b6105da565b6040516101cb9594939291906111df565b60405180910390f35b6101ee60048036036101e99190810190610d2c565b6106e8565b6040516101fb919061116a565b60405180910390f35b61021e60048036036102199190810190610de7565b610747565b60405161022f9594939291906110d9565b60405180910390f35b610252600480360361024d9190810190610d03565b610a70565b60405161025f919061116a565b60405180910390f35b610270610abc565b60405161027d91906110b7565b60405180910390f35b6000818154811061029357fe5b90600052602060002090600502016000915090508060000154908060010160009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1690806002015490806003015490806004018054600181600116156101000203166002900480601f0160208091040260200160405190810160405280929190818152602001828054600181600116156101000203166002900480156103775780601f1061034c57610100808354040283529160200191610377565b820191906000526020600020905b81548152906001019060200180831161035a57829003601f168201915b5050505050905085565b6000806001600084815260200190815260200160002080549050119050919050565b600060016000838152602001908152602001600020805490509050919050565b60008351905060008090505b818110156105a05760008582815181106103e557fe5b6020026020010151905060006040518060a001604052808381526020013373ffffffffffffffffffffffffffffffffffffffff16815260200143815260200187815260200186815250908060018154018082558091505090600182039060005260206000209060050201600090919290919091506000820151816000015560208201518160010160006101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff160217905550604082015181600201556060820151816003015560808201518160040190805190602001906104da929190610b5d565b505050506000600160008054905003905060016000838152602001908152602001600020819080600181540180825580915050906001820390600052602060002001600090919290919091505550600260003373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff168152602001908152602001600020819080600181540180825580915050906001820390600052602060002001600090919290919091505550505080806001019150506103cf565b5050505050565b60006001600084815260200190815260200160002082815481106105c757fe5b9060005260206000200154905092915050565b600080600080606060008087815481106105f057fe5b9060005260206000209060050201905080600001548160010160009054906101000a900473ffffffffffffffffffffffffffffffffffffffff168260020154836003015484600401808054600181600116156101000203166002900480601f0160208091040260200160405190810160405280929190818152602001828054600181600116156101000203166002900480156106cd5780601f106106a2576101008083540402835291602001916106cd565b820191906000526020600020905b8154815290600101906020018083116106b057829003601f168201915b50505050509050955095509550955095505091939590929450565b6000600260008473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff168152602001908152602001600020828154811061073457fe5b9060005260206000200154905092915050565b606080606080606060006001600088815260200190815260200160002080549050905060608160405190808252806020026020018201604052801561079b5781602001602082028038833980820191505090505b5090506060826040519080825280602002602001820160405280156107cf5781602001602082028038833980820191505090505b5090506060836040519080825280602002602001820160405280156108035781602001602082028038833980820191505090505b5090506060846040519080825280602002602001820160405280156108375781602001602082028038833980820191505090505b50905060608560405190808252806020026020018201604052801561087057816020015b606081526020019060019003908161085b5790505b50905060008090505b86811015610a51576000600160008f815260200190815260200160002082815481106108a157fe5b9060005260206000200154905060008082815481106108bc57fe5b9060005260206000209060050201905080600001548884815181106108dd57fe5b6020026020010181815250508060010160009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1687848151811061091a57fe5b602002602001019073ffffffffffffffffffffffffffffffffffffffff16908173ffffffffffffffffffffffffffffffffffffffff1681525050806002015486848151811061096557fe5b602002602001018181525050806003015485848151811061098257fe5b602002602001018181525050806004018054600181600116156101000203166002900480601f016020809104026020016040519081016040528092919081815260200182805460018160011615610100020316600290048015610a265780601f106109fb57610100808354040283529160200191610a26565b820191906000526020600020905b815481529060010190602001808311610a0957829003601f168201915b5050505050848481518110610a3757fe5b602002602001018190525050508080600101915050610879565b5084848484849a509a509a509a509a5050505050505091939590929450565b6000600260008373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff168152602001908152602001600020805490509050919050565b606060006001600080549050039050606081604051908082528060200260200182016040528015610afc5781602001602082028038833980820191505090505b5090506000600190505b828111610b545760008181548110610b1a57fe5b906000526020600020906005020160000154826001830381518110610b3b57fe5b6020026020010181815250508080600101915050610b06565b50809250505090565b828054600181600116156101000203166002900490600052602060002090601f016020900481019282601f10610b9e57805160ff1916838001178555610bcc565b82800160010185558215610bcc579182015b82811115610bcb578251825591602001919060010190610bb0565b5b509050610bd99190610bdd565b5090565b610bff91905b80821115610bfb576000816000905550600101610be3565b5090565b90565b600081359050610c1181611438565b92915050565b600082601f830112610c2857600080fd5b8135610c3b610c3682611266565b611239565b91508181835260208401935060208101905083856020840282011115610c6057600080fd5b60005b83811015610c905781610c768882610cee565b845260208401935060208301925050600181019050610c63565b5050505092915050565b600082601f830112610cab57600080fd5b8135610cbe610cb98261128e565b611239565b91508082526020830160208301858383011115610cda57600080fd5b610ce58382846113e5565b50505092915050565b600081359050610cfd8161144f565b92915050565b600060208284031215610d1557600080fd5b6000610d2384828501610c02565b91505092915050565b60008060408385031215610d3f57600080fd5b6000610d4d85828601610c02565b9250506020610d5e85828601610cee565b9150509250929050565b600080600060608486031215610d7d57600080fd5b600084013567ffffffffffffffff811115610d9757600080fd5b610da386828701610c17565b9350506020610db486828701610cee565b925050604084013567ffffffffffffffff811115610dd157600080fd5b610ddd86828701610c9a565b9150509250925092565b600060208284031215610df957600080fd5b6000610e0784828501610cee565b91505092915050565b60008060408385031215610e2357600080fd5b6000610e3185828601610cee565b9250506020610e4285828601610cee565b9150509250929050565b6000610e588383610e90565b60208301905092915050565b6000610e708383611027565b905092915050565b6000610e848383611099565b60208301905092915050565b610e998161139d565b82525050565b610ea88161139d565b82525050565b6000610eb9826112ea565b610ec38185611348565b9350610ece836112ba565b8060005b83811015610eff578151610ee68882610e4c565b9750610ef183611321565b925050600181019050610ed2565b5085935050505092915050565b6000610f17826112f5565b610f218185611359565b935083602082028501610f33856112ca565b8060005b85811015610f6f5784840389528151610f508582610e64565b9450610f5b8361132e565b925060208a01995050600181019050610f37565b50829750879550505050505092915050565b6000610f8c82611300565b610f96818561136a565b9350610fa1836112da565b8060005b83811015610fd2578151610fb98882610e78565b9750610fc48361133b565b925050600181019050610fa5565b5085935050505092915050565b610fe8816113af565b82525050565b6000610ff982611316565b611003818561138c565b93506110138185602086016113f4565b61101c81611427565b840191505092915050565b60006110328261130b565b61103c818561137b565b935061104c8185602086016113f4565b61105581611427565b840191505092915050565b600061106b8261130b565b611075818561138c565b93506110858185602086016113f4565b61108e81611427565b840191505092915050565b6110a2816113db565b82525050565b6110b1816113db565b82525050565b600060208201905081810360008301526110d18184610f81565b905092915050565b600060a08201905081810360008301526110f38188610f81565b905081810360208301526111078187610eae565b9050818103604083015261111b8186610f81565b9050818103606083015261112f8185610f81565b905081810360808301526111438184610f0c565b90509695505050505050565b60006020820190506111646000830184610fdf565b92915050565b600060208201905061117f60008301846110a8565b92915050565b600060a08201905061119a60008301886110a8565b6111a76020830187610e9f565b6111b460408301866110a8565b6111c160608301856110a8565b81810360808301526111d38184611060565b90509695505050505050565b600060a0820190506111f460008301886110a8565b6112016020830187610e9f565b61120e60408301866110a8565b61121b60608301856110a8565b818103608083015261122d8184610fee565b90509695505050505050565b6000604051905081810181811067ffffffffffffffff8211171561125c57600080fd5b8060405250919050565b600067ffffffffffffffff82111561127d57600080fd5b602082029050602081019050919050565b600067ffffffffffffffff8211156112a557600080fd5b601f19601f8301169050602081019050919050565b6000819050602082019050919050565b6000819050602082019050919050565b6000819050602082019050919050565b600081519050919050565b600081519050919050565b600081519050919050565b600081519050919050565b600081519050919050565b6000602082019050919050565b6000602082019050919050565b6000602082019050919050565b600082825260208201905092915050565b600082825260208201905092915050565b600082825260208201905092915050565b600082825260208201905092915050565b600082825260208201905092915050565b60006113a8826113bb565b9050919050565b60008115159050919050565b600073ffffffffffffffffffffffffffffffffffffffff82169050919050565b6000819050919050565b82818337600083830152505050565b60005b838110156114125780820151818401526020810190506113f7565b83811115611421576000848401525b50505050565b6000601f19601f8301169050919050565b6114418161139d565b811461144c57600080fd5b50565b611458816113db565b811461146357600080fd5b5056fea365627a7a72315820894571b1a01e0673eb7d597ded33c53d72fe297dbf1e8c39fab6e43673e3db616c6578706572696d656e74616cf564736f6c63430005100040";
+
+        public StandardTokenDeployment() : base(BYTECODE)
+        {
+        }
+
+        [Parameter("uint256", "totalSupply")]
+        public BigInteger TotalSupply { get; set; }
+    }
+}

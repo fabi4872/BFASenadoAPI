@@ -1,4 +1,5 @@
 ﻿using BFASenado.Models;
+using BFASenado.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
 using System.Text.Json.Serialization;
@@ -32,6 +33,7 @@ namespace BFASenado
             });
 
             services.AddAutoMapper(typeof(Startup));
+            services.AddTransient<IMessageService, MessageService>();
         }
 
         public void Configure(IApplicationBuilder app, IWebHostEnvironment env)

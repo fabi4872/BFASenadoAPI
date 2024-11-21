@@ -1,7 +1,7 @@
 [
   {
     "ContainingType": "BFASenado.Controllers.BFAController",
-    "Method": "StoreHash",
+    "Method": "GuardarHash",
     "RelativePath": "api/BFA/GuardarHash",
     "HttpMethod": "POST",
     "IsController": true,
@@ -9,15 +9,25 @@
     "Parameters": [
       {
         "Name": "input",
-        "Type": "BFASenado.Controllers.HashInput",
+        "Type": "BFASenado.DTO.HashDTO.GuardarHashDTO",
         "IsRequired": true
       }
     ],
-    "ReturnTypes": []
+    "ReturnTypes": [
+      {
+        "Type": "BFASenado.DTO.HashDTO.HashDTO",
+        "MediaTypes": [
+          "text/plain",
+          "application/json",
+          "text/json"
+        ],
+        "StatusCode": 200
+      }
+    ]
   },
   {
     "ContainingType": "BFASenado.Controllers.BFAController",
-    "Method": "GetHashData",
+    "Method": "Hash",
     "RelativePath": "api/BFA/Hash",
     "HttpMethod": "GET",
     "IsController": true,
@@ -29,7 +39,17 @@
         "IsRequired": false
       }
     ],
-    "ReturnTypes": []
+    "ReturnTypes": [
+      {
+        "Type": "BFASenado.DTO.HashDTO.HashDTO",
+        "MediaTypes": [
+          "text/plain",
+          "application/json",
+          "text/json"
+        ],
+        "StatusCode": 200
+      }
+    ]
   },
   {
     "ContainingType": "BFASenado.Controllers.BFAController",
@@ -39,6 +59,16 @@
     "IsController": true,
     "Order": 0,
     "Parameters": [],
-    "ReturnTypes": []
+    "ReturnTypes": [
+      {
+        "Type": "System.Collections.Generic.List\u00601[[BFASenado.DTO.HashDTO.HashDTO, BFASenado, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]",
+        "MediaTypes": [
+          "text/plain",
+          "application/json",
+          "text/json"
+        ],
+        "StatusCode": 200
+      }
+    ]
   }
 ]
