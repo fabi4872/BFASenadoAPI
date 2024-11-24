@@ -1,6 +1,26 @@
 [
   {
     "ContainingType": "BFASenado.Controllers.BFAController",
+    "Method": "Balance",
+    "RelativePath": "api/BFA/Balance",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [],
+    "ReturnTypes": [
+      {
+        "Type": "System.Decimal",
+        "MediaTypes": [
+          "text/plain",
+          "application/json",
+          "text/json"
+        ],
+        "StatusCode": 200
+      }
+    ]
+  },
+  {
+    "ContainingType": "BFASenado.Controllers.BFAController",
     "Method": "GuardarHash",
     "RelativePath": "api/BFA/GuardarHash",
     "HttpMethod": "POST",

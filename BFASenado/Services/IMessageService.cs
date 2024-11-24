@@ -2,6 +2,15 @@
 {
     public interface IMessageService
     {
+        // Success
+        string GetBalanceSuccess();
+        string GetHashSuccess();
+        string GetHashesSuccess();
+        string PostHashSuccess();
+
+
+
+        // Error
         string GetBalanceError();
         string GetHashErrorFormatoIncorrecto();
         string GetHashErrorNotFound();

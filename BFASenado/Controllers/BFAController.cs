@@ -7,6 +7,8 @@ using BFASenado.Models;
 using Microsoft.EntityFrameworkCore;
 using BFASenado.DTO.HashDTO;
 using BFASenado.Services;
+using BFASenado.DTO.LogDTO;
+using System.Security.Policy;
 
 namespace BFASenado.Controllers
 {
@@ -21,6 +23,7 @@ namespace BFASenado.Controllers
 
         // Logger
         private readonly ILogger<BFAController> _logger;
+        private readonly ILogService _logService;
 
         // Configuration
         private readonly IConfiguration _configuration;
@@ -42,11 +45,13 @@ namespace BFASenado.Controllers
         #region Constructor
 
         public BFAController(
+            ILogService logService,
             ILogger<BFAController> logger, 
             BFAContext context, 
             IConfiguration configuration,
             IMessageService messageService)
         {
+            _logService = logService;
             _logger = logger;
             _context = context;
             _configuration = configuration;
@@ -73,11 +78,29 @@ namespace BFASenado.Controllers
                 var web3 = new Web3(UrlNodoPrueba);
                 var balanceWei = await web3.Eth.GetBalance.SendRequestAsync(Sellador);
                 var balanceEther = Web3.Convert.FromWei(balanceWei);
-                return balanceEther;
+
+                // Log Éxito
+                var log = _logService.CrearLog(
+                    HttpContext, 
+                    null, 
+                    $"{_messageService.GetBalanceSuccess()}", 
+                    null);
+                _logger.LogInformation("{@Log}", log);
+
+                // Retornar el balance
+                return Ok(balanceEther);
             }
             catch (Exception ex)
             {
-                throw new Exception($"{_messageService.GetBalanceError()}. {ex.Message}");
+                // Log Error
+                var log = _logService.CrearLog(
+                    HttpContext, 
+                    null, 
+                    $"{_messageService.GetBalanceError()}. {ex.Message}", 
+                    ex.StackTrace);
+                _logger.LogError("{@Log}", log);
+                
+                throw new Exception($"{_messageService.GetBalanceError()}. {ex.Message}. {ex.StackTrace}");
             }
         }
 
@@ -94,11 +117,28 @@ namespace BFASenado.Controllers
                 if (responseData == null)
                     return NotFound($"{_messageService.GetHashErrorNotFound()}: {hash}");
 
+                // Log Éxito
+                var log = _logService.CrearLog(
+                    HttpContext,
+                    hash,
+                    $"{_messageService.GetHashSuccess()}",
+                    null);
+                _logger.LogInformation("{@Log}", log);
+
+                // Retornar el hash
                 return Ok(responseData);
             }
             catch (Exception ex)
             {
-                throw new Exception($"{_messageService.GetHashError()}. {ex.Message}");
+                // Log Error
+                var log = _logService.CrearLog(
+                    HttpContext,
+                    hash,
+                    $"{_messageService.GetHashError()}. {ex.Message}",
+                    ex.StackTrace);
+                _logger.LogError("{@Log}", log);
+
+                throw new Exception($"{_messageService.GetHashError()}. {ex.Message}. {ex.StackTrace}");
             }
         }
 
@@ -136,12 +176,28 @@ namespace BFASenado.Controllers
                     }
                 }
 
+                // Log Éxito
+                var log = _logService.CrearLog(
+                    HttpContext,
+                    null,
+                    $"{_messageService.GetHashesSuccess()}",
+                    null);
+                _logger.LogInformation("{@Log}", log);
+
                 // Retornar la lista de hashes
                 return Ok(hashes);
             }
             catch (Exception ex)
             {
-                throw new Exception($"{_messageService.GetHashesError()}. {ex.Message}");
+                // Log Error
+                var log = _logService.CrearLog(
+                    HttpContext,
+                    null,
+                    $"{_messageService.GetHashesError()}. {ex.Message}",
+                    ex.StackTrace);
+                _logger.LogError("{@Log}", log);
+
+                throw new Exception($"{_messageService.GetHashesError()}. {ex.Message}. {ex.StackTrace}");
             }
         }
 
@@ -191,14 +247,34 @@ namespace BFASenado.Controllers
                     }
                 }
 
+                // Log Éxito
+                var log = _logService.CrearLog(
+                    HttpContext,
+                    input,
+                    $"{_messageService.PostHashSuccess()}",
+                    null);
+                _logger.LogInformation("{@Log}", log);
+
+                // Retornar el hash guardado
                 return Ok(await this.GetHashDTO(hashHex, false));
             }
             catch (Exception ex)
             {
-                throw new Exception($"{_messageService.PostHashError}. {ex.Message}");
+                // Log Error
+                var log = _logService.CrearLog(
+                    HttpContext,
+                    input,
+                    $"{_messageService.PostHashError()}. {ex.Message}",
+                    ex.StackTrace);
+                _logger.LogError("{@Log}", log);
+
+                throw new Exception($"{_messageService.PostHashError}. {ex.Message}. {ex.StackTrace}");
             }
         }
 
+
+
+        // Métodos privados
         private async Task<HashDTO?> GetHashDTO(string hash, bool showBase64)
         {
             if (!hash.StartsWith("0x"))

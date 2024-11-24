@@ -1,6 +1,8 @@
 ﻿using BFASenado.Models;
 using BFASenado.Services;
+using ElmahCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using Microsoft.OpenApi.Models;
 using System.Text.Json.Serialization;
 
@@ -34,6 +36,18 @@ namespace BFASenado
 
             services.AddAutoMapper(typeof(Startup));
             services.AddTransient<IMessageService, MessageService>();
+            services.AddTransient<ILogService, LogService>();
+
+            // Registrar IHttpContextAccessor
+            services.AddHttpContextAccessor();
+
+            // Configuración de ELMAH
+            services.AddElmah();
+
+            services.AddLogging(builder =>
+            {
+                builder.AddFile("Logs/app-{Date}.log"); // Guarda logs en la carpeta Logs
+            });
         }
 
         public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
@@ -50,6 +64,9 @@ namespace BFASenado
             app.UseRouting();
 
             app.UseAuthorization();
+
+            // Middleware de ELMAH
+            app.UseElmah();
 
             app.UseEndpoints(endpoints =>
             {

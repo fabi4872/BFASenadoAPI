@@ -10,6 +10,30 @@
 
         #region Methods
 
+        // Success
+        public string GetBalanceSuccess()
+        {
+            return "Balance/gas de la cuenta obtenido correctamente";
+        }
+
+        public string GetHashSuccess()
+        {
+            return "Hash obtenido correctamente";
+        }
+
+        public string GetHashesSuccess()
+        {
+            return "Hashes obtenidos correctamente";
+        }
+
+        public string PostHashSuccess()
+        {
+            return "Hash guardado correctamente";
+        }
+
+
+
+        // Error
         public string GetBalanceError()
         {
             return "Error al obtener el balance/gas de la cuenta";
