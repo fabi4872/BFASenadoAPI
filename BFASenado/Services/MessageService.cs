@@ -10,6 +10,11 @@
 
         #region Methods
 
+        public string GetBalanceError()
+        {
+            return "Error al obtener el balance/gas de la cuenta";
+        }
+
         public string GetHashErrorFormatoIncorrecto()
         {
             return "El hash tiene un formato incorrecto";

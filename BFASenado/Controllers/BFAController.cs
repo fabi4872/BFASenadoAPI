@@ -33,9 +33,9 @@ namespace BFASenado.Controllers
         private static int ChainID;
         private static string? Tabla;
         private static string? Sellador;
-        private static string? PrivateKeyV2;
-        private static string? ContractAddressV2;
-        private static string? ABIV2;
+        private static string? PrivateKey;
+        private static string? ContractAddress;
+        private static string? ABI;
 
         #endregion
 
@@ -56,14 +56,30 @@ namespace BFASenado.Controllers
             ChainID = Convert.ToInt32(_configuration.GetSection("ChainID")?.Value);
             Tabla = _configuration.GetSection("Tabla").Value;
             Sellador = _configuration.GetSection("Sellador").Value;
-            PrivateKeyV2 = _configuration.GetSection("PrivateKeyV2").Value;
-            ContractAddressV2 = _configuration.GetSection("ContractAddressV2").Value;
-            ABIV2 = _configuration.GetSection("ABIV2").Value;
+            PrivateKey = _configuration.GetSection("PrivateKey").Value;
+            ContractAddress = _configuration.GetSection("ContractAddress").Value;
+            ABI = _configuration.GetSection("ABI").Value;
         }
 
         #endregion
 
         #region Methods
+
+        [HttpGet("Balance")]
+        public async Task<ActionResult<decimal>> Balance()
+        {
+            try
+            {
+                var web3 = new Web3(UrlNodoPrueba);
+                var balanceWei = await web3.Eth.GetBalance.SendRequestAsync(Sellador);
+                var balanceEther = Web3.Convert.FromWei(balanceWei);
+                return balanceEther;
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"{_messageService.GetBalanceError()}. {ex.Message}");
+            }
+        }
 
         [HttpGet("Hash")]
         public async Task<ActionResult<HashDTO>> Hash([FromQuery] string hash)
@@ -91,7 +107,7 @@ namespace BFASenado.Controllers
         {
             try
             {
-                var account = new Account(PrivateKeyV2, ChainID);
+                var account = new Account(PrivateKey, ChainID);
                 var web3 = new Web3(account, UrlNodoPrueba);
                 List<HashDTO> hashes = new List<HashDTO>();
 
@@ -99,7 +115,7 @@ namespace BFASenado.Controllers
                 web3.TransactionManager.UseLegacyAsDefault = true;
 
                 // Cargar el contrato en la dirección especificada
-                var contract = web3.Eth.GetContract(ABIV2, ContractAddressV2);
+                var contract = web3.Eth.GetContract(ABI, ContractAddress);
 
                 // Llamar a la función "getAllHashes" del contrato
                 var getAllHashesFunction = contract.GetFunction("getAllHashes");
@@ -139,11 +155,11 @@ namespace BFASenado.Controllers
                     return BadRequest(_messageService.GetHashErrorFormatoIncorrecto());
                 }
 
-                var account = new Account(PrivateKeyV2);
+                var account = new Account(PrivateKey);
                 var web3 = new Web3(account, UrlNodoPrueba);
                 web3.TransactionManager.UseLegacyAsDefault = true;
 
-                var contract = web3.Eth.GetContract(ABIV2, ContractAddressV2);
+                var contract = web3.Eth.GetContract(ABI, ContractAddress);
                 var putFunction = contract.GetFunction("put");
 
                 BigInteger hashValue = input.Hash.HexToBigInteger(false);
@@ -183,14 +199,6 @@ namespace BFASenado.Controllers
             }
         }
 
-        private async Task<decimal> GetBalance()
-        {
-            var web3 = new Web3(UrlNodoPrueba);
-            var balanceWei = await web3.Eth.GetBalance.SendRequestAsync(Sellador);
-            var balanceEther = Web3.Convert.FromWei(balanceWei);
-            return balanceEther;
-        }
-
         private async Task<HashDTO?> GetHashDTO(string hash, bool showBase64)
         {
             if (!hash.StartsWith("0x"))
@@ -199,11 +207,11 @@ namespace BFASenado.Controllers
 
             BigInteger hashValue = hash.HexToBigInteger(false);
 
-            var account = new Account(PrivateKeyV2, ChainID);
+            var account = new Account(PrivateKey, ChainID);
             var web3 = new Web3(account, UrlNodoPrueba);
             web3.TransactionManager.UseLegacyAsDefault = true;
 
-            var contract = web3.Eth.GetContract(ABIV2, ContractAddressV2);
+            var contract = web3.Eth.GetContract(ABI, ContractAddress);
             var getHashDataFunction = contract.GetFunction("getHashData");
             var result = await getHashDataFunction.CallDeserializingToObjectAsync<HashDataDTO>(hashValue);
 
