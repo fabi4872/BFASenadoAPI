@@ -231,7 +231,7 @@ namespace BFASenado.Controllers
                     // Log
                     var logFormatoIncorrecto = _logService.CrearLog(
                         HttpContext,
-                        input,
+                        input.Hash,
                         $"{_messageService.GetHashErrorFormatoIncorrecto()}",
                         null);
                     _logger.LogInformation("{@Log}", logFormatoIncorrecto);
@@ -256,7 +256,7 @@ namespace BFASenado.Controllers
                     // Log
                     var logHashExists = _logService.CrearLog(
                         HttpContext,
-                        input,
+                        input.Hash,
                         $"{_messageService.GetHashExists()}",
                         null);
                     _logger.LogInformation("{@Log}", logHashExists);
@@ -286,7 +286,7 @@ namespace BFASenado.Controllers
                 // Log Éxito
                 var log = _logService.CrearLog(
                     HttpContext,
-                    input,
+                    input.Hash,
                     $"{_messageService.PostHashSuccess()}",
                     null);
                 _logger.LogInformation("{@Log}", log);
@@ -299,7 +299,7 @@ namespace BFASenado.Controllers
                 // Log Error
                 var log = _logService.CrearLog(
                     HttpContext,
-                    input,
+                    input.Hash,
                     $"{_messageService.PostHashError()}. {ex.Message}",
                     ex.StackTrace);
                 _logger.LogError("{@Log}", log);
@@ -374,7 +374,7 @@ namespace BFASenado.Controllers
                 // Log Error
                 var log = _logService.CrearLog(
                     HttpContext,
-                    $"Base64: {base64}. Hash: {hash}",
+                    hash,
                     $"{_messageService.PostBaseDatosError()}. {ex.Message}",
                     ex.StackTrace);
                 _logger.LogError("{@Log}", log);
