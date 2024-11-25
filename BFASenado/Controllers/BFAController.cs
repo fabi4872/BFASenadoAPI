@@ -110,12 +110,32 @@ namespace BFASenado.Controllers
             try
             {
                 if (string.IsNullOrEmpty(hash.Trim()))
+                {
+                    // Log
+                    var logFormatoIncorrecto = _logService.CrearLog(
+                        HttpContext,
+                        hash,
+                        $"{_messageService.GetHashErrorFormatoIncorrecto()}",
+                        null);
+                    _logger.LogInformation("{@Log}", logFormatoIncorrecto);
+
                     return BadRequest(_messageService.GetHashErrorFormatoIncorrecto());
+                }
 
                 HashDTO? responseData = await this.GetHashDTO(hash, true);
 
                 if (responseData == null)
+                {
+                    // Log
+                    var logNotFound = _logService.CrearLog(
+                        HttpContext,
+                        hash,
+                        $"{_messageService.GetHashErrorNotFound()}",
+                        null);
+                    _logger.LogInformation("{@Log}", logNotFound);
+
                     return NotFound($"{_messageService.GetHashErrorNotFound()}: {hash}");
+                }
 
                 // Log Éxito
                 var log = _logService.CrearLog(
@@ -208,6 +228,14 @@ namespace BFASenado.Controllers
             {
                 if (string.IsNullOrEmpty(input.Hash?.Trim()))
                 {
+                    // Log
+                    var logFormatoIncorrecto = _logService.CrearLog(
+                        HttpContext,
+                        input,
+                        $"{_messageService.GetHashErrorFormatoIncorrecto()}",
+                        null);
+                    _logger.LogInformation("{@Log}", logFormatoIncorrecto);
+
                     return BadRequest(_messageService.GetHashErrorFormatoIncorrecto());
                 }
 
@@ -225,6 +253,14 @@ namespace BFASenado.Controllers
                 bool exists = await checkHashFunction.CallAsync<bool>(hashHex);
                 if (exists)
                 {
+                    // Log
+                    var logHashExists = _logService.CrearLog(
+                        HttpContext,
+                        input,
+                        $"{_messageService.GetHashExists()}",
+                        null);
+                    _logger.LogInformation("{@Log}", logHashExists);
+
                     return BadRequest(_messageService.GetHashExists());
                 }
 
@@ -335,7 +371,15 @@ namespace BFASenado.Controllers
             }
             catch (Exception ex)
             {
-                throw new Exception($"{_messageService.PostBaseDatosError()}. {ex.Message}");
+                // Log Error
+                var log = _logService.CrearLog(
+                    HttpContext,
+                    $"Base64: {base64}. Hash: {hash}",
+                    $"{_messageService.PostBaseDatosError()}. {ex.Message}",
+                    ex.StackTrace);
+                _logger.LogError("{@Log}", log);
+
+                throw new Exception($"{_messageService.PostBaseDatosError()}. {ex.Message}. {ex.StackTrace}");
             }
         }
 
@@ -347,7 +391,15 @@ namespace BFASenado.Controllers
             }
             catch (Exception ex)
             {
-                throw new Exception($"{_messageService.GetBaseDatosError()}. {ex.Message}");
+                // Log Error
+                var log = _logService.CrearLog(
+                    HttpContext,
+                    hash,
+                    $"{_messageService.GetBaseDatosError()}. {ex.Message}",
+                    ex.StackTrace);
+                _logger.LogError("{@Log}", log);
+
+                throw new Exception($"{_messageService.GetBaseDatosError()}. {ex.Message}. {ex.StackTrace}");
             }
         }
 
